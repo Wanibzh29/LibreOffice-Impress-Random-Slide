@@ -1,0 +1,79 @@
+Sub ShuffleSlidesToCustomPres
+    ' Nom de la Custom Presentation à utiliser (crée-la dans Slide Show ▸ Custom Slide Shows)
+    Const CUSTOM_NAME As String = "ShuffledSlides"
+    ' Si True, la première diapositive (index 0) reste à sa place (utile pour conserver une page de titre)
+    Const EXCLUDE_FIRST_SLIDE As Boolean = False
+
+    Dim oDoc As Object
+    Dim oDrawPages As Object
+    Dim nCount As Long
+    Dim i As Long, j As Long, tmp As Long
+    Dim indices() As Long
+    Dim itemCount As Long
+    Dim CustPres As Object
+    Dim MyCust As Object
+    Dim RndSlide As Object
+    Dim baseIndex As Long
+
+    oDoc = ThisComponent
+    oDrawPages = oDoc.getDrawPages()
+    nCount = oDrawPages.getCount()
+
+    If nCount < 2 Then
+        MsgBox "Pas assez de diapositives pour mélanger."
+        Exit Sub
+    End If
+
+    ' Construire la liste des indices à mélanger
+    If EXCLUDE_FIRST_SLIDE Then
+        baseIndex = 1
+        itemCount = nCount - 1
+    Else
+        baseIndex = 0
+        itemCount = nCount
+    End If
+
+    ReDim indices(itemCount - 1)
+    For i = 0 To itemCount - 1
+        indices(i) = baseIndex + i
+    Next i
+
+    ' Fisher-Yates shuffle
+    Randomize
+    For i = itemCount - 1 To 1 Step -1
+        j = Int(Rnd * (i + 1))
+        tmp = indices(i)
+        indices(i) = indices(j)
+        indices(j) = tmp
+    Next i
+
+    ' Récupérer la collection des Custom Presentations (doit exister)
+    On Error GoTo ErrNoCust
+    CustPres = oDoc.getCustomPresentations()
+    MyCust = CustPres.getByName(CUSTOM_NAME)
+    On Error GoTo 0
+
+    ' Vider la Custom Presentation si elle contient des diapositives
+    Dim curCount As Long
+    curCount = MyCust.getCount()
+    If curCount > 0 Then
+        For i = 0 To curCount - 1
+            ' toujours supprimer l'élément à l'index 0 jusqu'à vider
+            MyCust.removeByIndex(0)
+        Next i
+    End If
+
+    ' Remplir la Custom Presentation dans l'ordre mélangé
+    For i = 0 To itemCount - 1
+        RndSlide = oDrawPages.getByIndex(indices(i))
+        MyCust.insertByIndex(i, RndSlide)
+    Next i
+
+    MsgBox "Custom presentation '" & CUSTOM_NAME & "' mise à jour avec l'ordre aléatoire."
+
+    Exit Sub
+
+ErrNoCust:
+    MsgBox "Impossible de trouver la Custom Presentation nommée '" & CUSTOM_NAME & "'. " & _
+           "Crée-la d'abord via Slide Show ▸ Custom Slide Shows ▸ New, puis relance la macro.", 48, "Custom presentation manquante"
+End Sub
